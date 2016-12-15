@@ -1,17 +1,13 @@
 #include "confparams.h"
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <ESP8266HTTPClient.h>
 
 int ledState = LOW;
 WiFiClient espClient;
-PubSubClient client(espClient);
-const int clientIdLen = strlen(MQTT_CLIENT_ID_PREFIX) + 5;
-char clientId[clientIdLen] = MQTT_CLIENT_ID_PREFIX;
-unsigned long lastHeartbeatMillis = 0;
 
 /**
- * Inverted HIGH/LOW logic
- */
+   Inverted HIGH/LOW logic
+*/
 void updateLed() {
   if (ledState == HIGH) {
     digitalWrite(BUILTIN_LED, LOW);
@@ -55,7 +51,6 @@ boolean checkWifi() {
   switchLed(HIGH);
 
   int tries = 0;
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
     if (tries >= 20) {
       // No connection after 10 seconds, error.
@@ -66,7 +61,6 @@ boolean checkWifi() {
     }
     tries++;
 
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     toggleLed();
     delay(500);
   }
@@ -77,65 +71,30 @@ boolean checkWifi() {
   return true;
 }
 
-void generateClientId() {
-  String suffix = String(random(0xffff), HEX);
-  strncpy(clientId + clientIdLen - 5, suffix.c_str(), 5);
-  Serial.print(F("New clientId generated: "));
-  Serial.println(clientId);
-}
-
-void checkMqtt() {
-  while (!client.connected()) {
-    Serial.println(F("Disconnected from MQTT Server, reconnecting..."));
-    generateClientId();
-    if (client.connect(clientId)) {
-      Serial.println(F("Reconnected to MQTT Server."));
-      sendHeartbeat(millis());
-    } 
-    else {
-      // display MQTT Failure: 2 times SOS, retry after 10 seconds
-      Serial.println(F("Connection to MQTT Server failed."));
-      sos();
-      delay(500);
-      sos();
-      delay(9500-(3600*2));
-    }
-  }
-}
-
-void checkHeartbeat() {
-  // almost overflow safe -- may decide to send two heartbeats directly after each other when millis overflow.
-  unsigned long nowMillis = millis();
-  unsigned long diff = nowMillis - lastHeartbeatMillis;
-  if (diff > MQTT_HEARTBEAT_INTERVAL) {
-    sendHeartbeat(nowMillis);
-  }
-}
-
-void sendHeartbeat(unsigned long nowMillis) {
-  Serial.println(F("Sending heartbeat."));
-  client.publish(MQTT_TOPIC_HEARTBEAT, clientId);
-  lastHeartbeatMillis = nowMillis;
-}
-
 void sendGasMeterEvent() {
   Serial.println(F("Sending gas meter event."));
-  String message = String(MQTT_GASMETER_EVENT_TEXT_BEFORE_CLIENT_ID);
-  message.concat(clientId);
-  message.concat(MQTT_GASMETER_EVENT_TEXT_AFTER_CLIENT_ID);
-  client.publish(MQTT_TOPIC_GASMETER, message.c_str());
+  HTTPClient http;
+  http.begin(HTTP_URL);
+  int httpCode = http.GET();
+
+  if (httpCode == HTTP_CODE_OK) {
+    Serial.println("HTTP request successful.");
+  }
+  else {
+    Serial.printf("HTTP request failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
 }
 
 /**
- * Rising edge detected, (pulled up)
- */
+   Rising edge detected, (pulled up)
+*/
 void handleRisingEdge() {
   switchLed(LOW);
 }
 
 /**
- * Falling edge detected, trigger web call.
- */
+   Falling edge detected, trigger web call.
+*/
 void handleFallingEdge() {
   switchLed(HIGH);
   sendGasMeterEvent();
@@ -144,8 +103,8 @@ void handleFallingEdge() {
 int pinState = LOW;
 
 /**
- *
- */
+
+*/
 void checkPinStateChange(int newPinState) {
   if (newPinState == pinState) {
     return;
@@ -168,17 +127,22 @@ void setup() {
   pinMode(COUNT_PIN, INPUT);
   pinMode(BUILTIN_LED, OUTPUT);
   randomSeed(micros());
-  client.setServer(MQTT_HOST, MQTT_PORT);
   Serial.begin(115200);
+  Serial.println(F(""));
+  reconnectWifi();
+}
+
+void reconnectWifi() {
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
 void loop() {
   if (!checkWifi()) {
+    reconnectWifi();
     delay(500);
     return;
   }
-  checkMqtt();
-  checkHeartbeat();
   int newPinState = digitalRead(COUNT_PIN);
   checkPinStateChange(newPinState);
   delay(200); // sleep for button bounces
