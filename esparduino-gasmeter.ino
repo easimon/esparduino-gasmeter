@@ -50,6 +50,7 @@ void checkWifi() {
   if (WiFi.status() == WL_CONNECTED) {
     return;
   }
+  Serial.println(F("Wifi disconnected, connecting..."));
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int tries = 0;
@@ -62,6 +63,7 @@ void checkWifi() {
     delay(500);
     if (tries >= 20) {
       // No connection after 10 seconds, error.
+      Serial.println(F("Wifi connection unsuccessful, abort..."));
       while (true) {
         sos();
         delay(500);
@@ -70,22 +72,28 @@ void checkWifi() {
 
   }
   // connection succeeded
+  Serial.println(F("Wifi connection successful."));
   blinkLed(100, 5);
 } 
 
 void generateClientId() {
   String suffix = String(random(0xffff), HEX);
   strncpy(clientId + clientIdLen - 5, suffix.c_str(), 5);
+  Serial.print(F("New clientId generated: "));
+  Serial.println(clientId);
 }
 
 void checkMqtt() {
   while (!client.connected()) {
+    Serial.println(F("Disconnected from MQTT Server, reconnecting..."));
     generateClientId();
     if (client.connect(clientId)) {
+      Serial.println(F("Reconnected to MQTT Server."));
       sendHeartbeat(millis());
     } 
     else {
       // display MQTT Failure: 2 times SOS, retry after 10 seconds
+      Serial.println(F("Connection to MQTT Server failed."));
       sos();
       delay(500);
       sos();
@@ -104,11 +112,13 @@ void checkHeartbeat() {
 }
 
 void sendHeartbeat(unsigned long nowMillis) {
+  Serial.println(F("Sending heartbeat."));
   client.publish(MQTT_TOPIC_HEARTBEAT, clientId);
   lastHeartbeatMillis = nowMillis;
 }
 
 void sendGasMeterEvent() {
+  Serial.println(F("Sending gas meter event."));
   String message = String(MQTT_GASMETER_EVENT_TEXT_BEFORE_CLIENT_ID);
   message.concat(clientId);
   message.concat(MQTT_GASMETER_EVENT_TEXT_AFTER_CLIENT_ID);
@@ -158,6 +168,7 @@ void setup() {
   pinMode(BUILTIN_LED, OUTPUT);
   randomSeed(micros());
   client.setServer(MQTT_HOST, MQTT_PORT);
+  Serial.begin(115200);
 }
 
 void loop() {
