@@ -46,35 +46,36 @@ void sos() {
   blinkLed(150, 3); // 2 * 3 * 150 = 900ms  -> 3600ms for one SOS
 }
 
-void checkWifi() {
+boolean checkWifi() {
   if (WiFi.status() == WL_CONNECTED) {
-    return;
+    return true;
   }
   Serial.println(F("Wifi disconnected, connecting..."));
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  int tries = 0;
   switchLed(HIGH);
 
+  int tries = 0;
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
-    tries++;
-    toggleLed();
-
-    delay(500);
     if (tries >= 20) {
       // No connection after 10 seconds, error.
-      Serial.println(F("Wifi connection unsuccessful, abort..."));
-      while (true) {
-        sos();
-        delay(500);
-      }
+      Serial.println(F("Wifi connection unsuccessful..."));
+      sos();
+      delay(500);
+      return false;
     }
+    tries++;
 
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    toggleLed();
+    delay(500);
   }
+
   // connection succeeded
   Serial.println(F("Wifi connection successful."));
   blinkLed(100, 5);
-} 
+  return true;
+}
 
 void generateClientId() {
   String suffix = String(random(0xffff), HEX);
@@ -172,7 +173,10 @@ void setup() {
 }
 
 void loop() {
-  checkWifi();
+  if (!checkWifi()) {
+    delay(500);
+    return;
+  }
   checkMqtt();
   checkHeartbeat();
   int newPinState = digitalRead(COUNT_PIN);
