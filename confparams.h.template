@@ -1,0 +1,22 @@
+#ifndef H_CONFPARAMS
+#define H_CONFPARAMS
+
+// Copy over to confparams.h and enter correct auth data.
+// TODO: Web configuration interface to make these hardcoded values obsolete. 
+#define WIFI_SSID "..."
+#define WIFI_PASSWORD "..." 
+#define MQTT_HOST "123.123.123.123"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME "..."
+#define MQTT_PASSWORD "..."
+
+// No need to change this
+#define COUNT_PIN 2
+#define MQTT_TOPIC_HEARTBEAT "smarthome/heartbeat"
+#define MQTT_TOPIC_GASMETER "smarthome/gasmeter"
+#define MQTT_CLIENT_ID_PREFIX "gasmeter-"
+#define MQTT_GASMETER_EVENT_TEXT_BEFORE_CLIENT_ID "{ \"type\": \"NORMAL\", \"amount\": 1, \"clientId\": \""
+#define MQTT_GASMETER_EVENT_TEXT_AFTER_CLIENT_ID "\" }"
+#define MQTT_HEARTBEAT_INTERVAL 10000
+
+#endif // H_CONFPARAMS
